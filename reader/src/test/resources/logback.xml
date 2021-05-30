@@ -1,0 +1,3 @@
+<configuration>
+    <logger name="io.micronaut.context" level="DEBUG"/>
+</configuration>
