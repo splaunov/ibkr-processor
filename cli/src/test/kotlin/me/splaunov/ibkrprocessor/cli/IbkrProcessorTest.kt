@@ -4,7 +4,7 @@ import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @MicronautTest
 class IbkrProcessorTest {
@@ -12,7 +12,8 @@ class IbkrProcessorTest {
     @Inject
     lateinit var application: EmbeddedApplication<*>
 
-    @Test @Disabled
+    @Test
+    @Disabled
     fun testItWorks() {
         Assertions.assertTrue(application.isRunning)
     }

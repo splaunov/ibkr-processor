@@ -6,7 +6,7 @@ import me.splaunov.ibkrprocessor.data.TradeOrder
 import me.splaunov.ibkrprocessor.reader.TradeOrderFields.*
 import java.io.File
 import java.time.LocalDate
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * Reads blocks of information from the IBKR Activity statement.

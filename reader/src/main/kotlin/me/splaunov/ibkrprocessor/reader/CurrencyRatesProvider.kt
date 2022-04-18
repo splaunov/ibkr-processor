@@ -5,7 +5,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import java.time.LocalDate
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Client("http://www.cbr.ru/scripts/")
 interface CentralBankHttpClient {

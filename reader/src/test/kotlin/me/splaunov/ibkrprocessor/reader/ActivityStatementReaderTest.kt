@@ -8,7 +8,7 @@ import me.splaunov.ibkrprocessor.data.TradeOrder
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.time.LocalDate
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @MicronautTest
 class ActivityStatementReaderTest {

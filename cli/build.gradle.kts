@@ -1,16 +1,32 @@
 plugins {
-    id("me.splaunov.micronaut.application.conventions")
+    id("common-conventions")
+    kotlin("kapt")
+    kotlin("plugin.allopen")
+    id("com.github.johnrengelman.shadow") version PluginVersions.SHADOW
+    id("io.micronaut.application") version PluginVersions.MICRONAUT
+}
+
+micronaut {
+    version(Versions.MICRONAUT)
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("me.splaunov.ibkrprocessor.*")
+    }
 }
 
 dependencies {
-    kapt("info.picocli:picocli-codegen:4.6.1")
-    implementation("info.picocli:picocli")
-    implementation("io.micronaut.picocli:micronaut-picocli")
+    kapt(platform(Micronaut.bom))
+    kapt(Other.picoCliCodeGen)
+    kapt(Micronaut.inject)
+    implementation(Other.picoCli)
+    implementation(Micronaut.picoCli)
+    implementation(kotlin("reflect"))
 
     implementation(project(":reader"))
     implementation(project(":exporter"))
 }
 
 application {
-    mainClass.set("me.splaunov.ibkrprocessor.cli.Application")
+    mainClass.set("me.splaunov.ibkrprocessor.cli.ApplicationKt")
 }

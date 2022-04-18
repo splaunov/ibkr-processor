@@ -7,7 +7,7 @@ import me.splaunov.ibkrprocessor.reader.PnlCalculator
 import picocli.CommandLine.Command
 import picocli.CommandLine.Parameters
 import java.io.File
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 @Command(name = "pnl")
 class Application : Runnable {

@@ -3,7 +3,7 @@ package me.splaunov.ibkrprocessor.reader
 import me.splaunov.ibkrprocessor.data.PurchaseOperationDetails
 import me.splaunov.ibkrprocessor.data.SellOperationDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * Processes list of trade orders and calculates PnL.

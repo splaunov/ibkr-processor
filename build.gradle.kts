@@ -1,8 +1,10 @@
 plugins {
-    kotlin("jvm") version "1.5.10" apply false
+    kotlin("plugin.allopen") version PluginVersions.KOTLIN apply false
 }
 
-allprojects {
-    group = "me.splaunov.ibkrprocessor"
-    version = "0.1"
+group = "me.splaunov.ibkrprocessor"
+version = "0.1"
+
+repositories {
+    mavenCentral()
 }
