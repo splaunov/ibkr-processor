@@ -24,7 +24,7 @@ class PnlCalculatorTest {
     ) {
         val actual = PnlCalculator(currencyRatesProvider).calculateRealizedPnlRub(sellOperations)
 
-        actual shouldBe expected
+        actual[2020] shouldBe expected
     }
 
     @Suppress("unused")

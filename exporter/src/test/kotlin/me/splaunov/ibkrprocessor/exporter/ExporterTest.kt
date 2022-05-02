@@ -23,7 +23,7 @@ class ExporterTest {
             SellOperationDetails(
                 TradeOrder(
                     "AAPL", "USD",
-                    LocalDate.parse("2020-08-21"), -2, 490.54f, -1.0f
+                    LocalDate.parse("2021-08-21"), -2, 490.54f, -1.0f
                 ), 73.7711f,
                 listOf(
                     PurchaseOperationDetails(
@@ -39,7 +39,7 @@ class ExporterTest {
         Exporter().export(sellOps, file)
 
         file.exists() shouldBe true
-        val sheet = XSSFWorkbook(file).getSheet("trades")
+        val sheet = XSSFWorkbook(file).getSheet("2021")
         sheet.getRow(1)?.getCell(0)?.stringCellValue shouldBe "AAPL"
         sheet.getRow(4)?.getCell(0)?.stringCellValue shouldBe "Итого"
     }

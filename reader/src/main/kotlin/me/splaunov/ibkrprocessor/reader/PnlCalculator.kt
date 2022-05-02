@@ -17,16 +17,21 @@ class PnlCalculator(private val currencyRatesProvider: CurrencyRatesProvider) {
      *
      * @return Calculated PnL in RUB
      */
-    fun calculateRealizedPnlRub(sellOperations: List<SellOperationDetails>): Float =
-        sellOperations.fold(0f) { acc1, sellOp ->
-            acc1 +
-                    sellOp.sellOrder.getProceedsBaseCurrency() * sellOp.currencyRate +
-                    sellOp.purchases.fold(0f) { acc2, purchaseOp ->
-                        acc2 + purchaseOp.purchaseOrder.getProceedsBaseCurrency(
-                            purchaseOp.quantitySold
-                        ) * purchaseOp.currencyRate
-                    }
+    fun calculateRealizedPnlRub(sellOperations: List<SellOperationDetails>): Map<Int, Float> {
+        val result = mutableMapOf(2020 to 0f, 2021 to 0f)
+        result.forEach { (year, _) ->
+            result[year] = sellOperations.filter { it.sellOrder.date.year == year }.fold(0f) { acc1, sellOp ->
+                acc1 +
+                        sellOp.sellOrder.getProceedsBaseCurrency() * sellOp.currencyRate +
+                        sellOp.purchases.fold(0f) { acc2, purchaseOp ->
+                            acc2 + purchaseOp.purchaseOrder.getProceedsBaseCurrency(
+                                purchaseOp.quantitySold
+                            ) * purchaseOp.currencyRate
+                        }
+            }
         }
+        return result
+    }
 
     fun getSellDetails(trades: List<TradeOrder>): List<SellOperationDetails> =
         trades.groupBy { it.symbol }.values.flatMap { oneSymbolTrades ->

@@ -8,13 +8,14 @@ import picocli.CommandLine.Command
 import picocli.CommandLine.Parameters
 import java.io.File
 import jakarta.inject.Inject
+import kotlin.system.exitProcess
 
 @Command(name = "pnl")
 class Application : Runnable {
-    @Parameters(index = "0", description = ["A csv file with IBKR activity report."])
-    lateinit var inCsvFile: File
+    @Parameters(index = "0", description = ["A directory with IBKR activity reports in csv files."])
+    lateinit var inCsvDir: File
 
-    @Parameters(index = "1", description = ["An .xlsx file name for export data."])
+    @Parameters(index = "1", description = ["An .xlsx file name for data export."])
     lateinit var outXlsxFile: File
 
     @Inject
@@ -24,8 +25,12 @@ class Application : Runnable {
     lateinit var pnlCalculator: PnlCalculator
 
     override fun run() {
-        println(inCsvFile.absolutePath)
-        val sellDetails = pnlCalculator.getSellDetails(reader.readTrades(inCsvFile))
+        println(inCsvDir.absolutePath)
+        if (inCsvDir.isFile) {
+            println("First parameter should be a directory")
+            exitProcess(1)
+        }
+        val sellDetails = pnlCalculator.getSellDetails(reader.readTrades(inCsvDir))
         Exporter().export(sellDetails, outXlsxFile)
         val pnl = pnlCalculator.calculateRealizedPnlRub(sellDetails)
         println("PnL: $pnl")

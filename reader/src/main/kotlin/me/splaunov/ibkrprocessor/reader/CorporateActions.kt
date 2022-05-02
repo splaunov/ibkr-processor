@@ -5,5 +5,10 @@ import java.time.LocalDate
 data class StockSplit(
     val symbol: String,
     val date: LocalDate,
-    val multiplier: Int
+    val multiplier: Int,
+)
+
+data class Acquisition(
+    val symbol: String,
+    val date: LocalDate,
 )

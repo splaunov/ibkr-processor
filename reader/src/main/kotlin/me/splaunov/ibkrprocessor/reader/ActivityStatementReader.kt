@@ -18,64 +18,83 @@ class ActivityStatementReader {
      * Reads trade orders' data.
      * Quantity and prices are adjusted according to stock splits if applicable.
      *
-     * @param file Activity statement file to read.
+     * @param dir Directory from which activity statement files should be read.
      * @return List of trade orders adjusted according to splits.
      */
-    fun readTrades(file: File): List<TradeOrder> {
-        val stockSplits = readSplits(file)
+    fun readTrades(dir: File): List<TradeOrder> {
+        val stockSplits = readCorporateActions(dir)
         val trades = mutableListOf<TradeOrder>()
-        csvReader().open(file) {
-            var record = readNext()
-            while (record != null) {
-                if (record[0] == "Trades" && record[1] == "Data" && record[2] == "Order" && record[3] == "Stocks") {
-                    val date = LocalDate.parse(record[DATE].take(10))
-                    val splitMultiplier = getSplitMultiplier(stockSplits, record[SYMBOL], date)
-                    var quantity = record[QUANTITY].toInt()
-                    var price = record[PRICE].toFloat()
-                    if (splitMultiplier != null) {
-                        price /= splitMultiplier
-                        quantity *= splitMultiplier
-                    }
-                    trades.add(
-                        TradeOrder(
-                            record[SYMBOL],
-                            record[CURRENCY],
-                            date,
-                            quantity,
-                            price,
-                            record[COMMISSION].toFloat()
+
+        dir.listFiles { f -> f.extension == "csv" }.forEach { file ->
+            csvReader().open(file) {
+                var record = readNext()
+                while (record != null) {
+                    if (record[0] == "Trades" && record[1] == "Data" && record[2] == "Order" && record[3] == "Stocks") {
+                        val date = LocalDate.parse(record[DATE].take(10))
+                        val splitMultiplier = getSplitMultiplier(stockSplits, record[SYMBOL], date)
+                        var quantity = record[QUANTITY].toInt()
+                        var price = record[PRICE].toFloat()
+                        if (splitMultiplier != null) {
+                            price /= splitMultiplier
+                            quantity *= splitMultiplier
+                        }
+                        trades.add(
+                            TradeOrder(
+                                record[SYMBOL],
+                                record[CURRENCY],
+                                date,
+                                quantity,
+                                price,
+                                record[COMMISSION].toFloat()
+                            )
                         )
-                    )
+                    }
+                    record = readNext()
                 }
-                record = readNext()
             }
         }
+
         return trades
     }
 
     /**
      * Reads info regarding stocks splits.
      */
-    fun readSplits(file: File): List<StockSplit> {
+    fun readCorporateActions(dir: File): List<StockSplit> {
         val splits = mutableListOf<StockSplit>()
-        csvReader().open(file) {
-            var record = readNext()
-            while (record != null) {
-                if (record[0] == "Corporate Actions" && record[1] == "Data" && record[2] == "Stocks") {
-                    val date = LocalDate.parse(record[CorporateActionFields.DATE].take(10))
-                    val regex = """^(\D+)\(\w+\) Split (\d+) for (\d+) \(\1, \D+, \w+\)""".toRegex()
-                    val match = regex.matchEntire(record[CorporateActionFields.DESCRIPTION])
-                        ?: throw IllegalStateException("Unknown corporate event: $record[CorporateActionFields.DESCRIPTION]")
-                    if (match.groupValues[3].toInt() != 1)
-                        throw IllegalStateException("Unknown corporate event: $record[CorporateActionFields.DESCRIPTION]")
-                    splits.add(
-                        StockSplit(match.groupValues[1], date, match.groupValues[2].toInt())
-                    )
+        val acquisitions = mutableListOf<Acquisition>()
+        dir.listFiles { f -> f.extension == "csv" }.forEach { file ->
+            csvReader().open(file) {
+                var record = readNext()
+                while (record != null) {
+                    if (record[0] == "Corporate Actions" && record[1] == "Data" && record[2] == "Stocks") {
+                        val date = LocalDate.parse(record[CorporateActionFields.DATE].take(10))
+                        val description = record[CorporateActionFields.DESCRIPTION]
+                        when {
+                            description.contains("Split") -> splits.add(readSplit(record, date))
+                            description.contains("Acquisition") -> acquisitions.add(readAcquisition(record, date))
+                            else -> throw IllegalStateException("Unknown corporate event: $record")
+                        }
+                    }
+                    record = readNext()
                 }
-                record = readNext()
             }
         }
         return splits
+    }
+
+    private fun readAcquisition(record: List<String>, date: LocalDate): Acquisition {
+        //TODO Implement parsing of acquisition info
+        return Acquisition("TODO", date)
+    }
+
+    private fun readSplit(record: List<String>, date: LocalDate): StockSplit {
+        val regex = """^(\D+)\(\w+\) Split (\d+) for (\d+) \(\1, \D+, \w+\)""".toRegex()
+        val match = regex.matchEntire(record[CorporateActionFields.DESCRIPTION])
+            ?: throw IllegalStateException("Unknown corporate event: $record")
+        if (match.groupValues[3].toInt() != 1)
+            throw IllegalStateException("Unknown corporate event: $record")
+        return StockSplit(match.groupValues[1], date, match.groupValues[2].toInt())
     }
 
     private fun getSplitMultiplier(splits: List<StockSplit>, symbol: String, date: LocalDate): Int? =

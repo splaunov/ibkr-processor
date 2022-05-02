@@ -1,7 +1,7 @@
 package me.splaunov.ibkrprocessor.reader
 
 import io.kotest.matchers.collections.shouldContain
-import io.kotest.matchers.collections.shouldHaveSingleElement
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import me.splaunov.ibkrprocessor.data.TradeOrder
@@ -22,12 +22,12 @@ class ActivityStatementReaderTest {
         val actual = reader.readTrades(
             File(
                 ActivityStatementReader::class.java.classLoader.getResource(
-                    "ibkr_activity_statement.csv"
+                    "statements"
                 )!!.file
             )
         )
 
-        actual shouldHaveSize 38
+        actual shouldHaveSize 76
         actual shouldContain TradeOrder(
             "AAPL", "USD",
             LocalDate.parse("2020-08-21"), 9 * 4, 490.54f / 4, -1.0f//, 73.7711f
@@ -35,15 +35,17 @@ class ActivityStatementReaderTest {
     }
 
     @Test
-    fun readSplits() {
-        val actual = reader.readSplits(
+    fun readCorporateActions() {
+        val actual = reader.readCorporateActions(
             File(
                 ActivityStatementReader::class.java.classLoader.getResource(
-                    "ibkr_activity_statement.csv"
+                    "statements"
                 )!!.file
             )
         )
 
-        actual shouldHaveSingleElement StockSplit("AAPL", LocalDate.parse("2020-08-28"), 4)
+        actual shouldContainExactlyInAnyOrder listOf(
+            StockSplit("AAPL", LocalDate.parse("2020-08-28"), 4),
+        )
     }
 }

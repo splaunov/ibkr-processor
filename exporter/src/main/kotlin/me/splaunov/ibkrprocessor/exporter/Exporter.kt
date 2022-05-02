@@ -15,7 +15,7 @@ class Exporter {
     fun export(saleOperations: List<SellOperationDetails>, file: File) {
         val template = TemplateHandler()
         saleOperations.forEach { saleOp ->
-            saleOp.purchases.forEach { template.addPurchase(it) }
+            saleOp.purchases.forEach { template.addPurchase(saleOp.sellOrder.date.year, it) }
             template.addSale(saleOp)
         }
         template.addSummary()
@@ -25,9 +25,8 @@ class Exporter {
     private class TemplateHandler {
         private val workbook: XSSFWorkbook
         private val formulaEvaluator: XSSFFormulaEvaluator
-        private val sheet: XSSFSheet
-        private var currentRowNum = 1
-        private var firstPurchaseRowNum = 1
+        private var currentRowNum = arrayOf(1, 1)
+        private var firstPurchaseRowNum = arrayOf(1, 1)
         private val summaryRowCaption: String
         private val dataColumnsStyles: Array<XSSFCellStyle?>
         private val summaryColumnsStyles: Array<XSSFCellStyle?>
@@ -37,16 +36,15 @@ class Exporter {
                 ?: throw IllegalStateException("Template not found.")
             inStream.use { workbook = XSSFWorkbook(inStream) }
 
-            sheet = workbook.getSheet("trades") ?: throw IllegalStateException("Sheet not found in the template.")
             formulaEvaluator = workbook.creationHelper.createFormulaEvaluator()
 
-            val dataRow = sheet.getRow(1)
+            val dataRow = workbook.getSheetAt(0).getRow(1)
             dataColumnsStyles = arrayOfNulls(dataRow.lastCellNum + 1)
             dataRow.cellIterator().forEach { cell ->
                 dataColumnsStyles[cell.columnIndex] = cell.cellStyle as XSSFCellStyle?
             }
 
-            val summaryRow = sheet.getRow(2)
+            val summaryRow = workbook.getSheetAt(0).getRow(2)
             val summaryRowCaptionCell = summaryRow.getCell(0)
             summaryRowCaption = summaryRowCaptionCell.stringCellValue
             summaryColumnsStyles = arrayOfNulls(summaryRow.lastCellNum + 1)
@@ -55,8 +53,13 @@ class Exporter {
             }
         }
 
-        fun addPurchase(purchase: PurchaseOperationDetails) {
-            val row = sheet.createRow(currentRowNum++)
+        private fun getSheet(name: String): XSSFSheet {
+            return workbook.getSheet(name) ?: throw IllegalStateException("Sheet with name '$name' not found in the template.")
+        }
+
+        fun addPurchase(sellYear: Int, purchase: PurchaseOperationDetails) {
+            val sheet = getSheet(sellYear.toString())
+            val row = sheet.createRow(currentRowNum[workbook.indexOf(sheet)]++)
             createCells(row, purchase.purchaseOrder)
 
             val commissionCell = row.getCell(COMMISSION)
@@ -71,7 +74,9 @@ class Exporter {
         }
 
         fun addSale(sale: SellOperationDetails) {
-            val row = sheet.createRow(currentRowNum++)
+            val sheet = getSheet(sale.sellOrder.date.year.toString())
+            val sheetIndex = workbook.indexOf(sheet)
+            val row = sheet.createRow(currentRowNum[sheetIndex]++)
             createCells(row, sale.sellOrder)
             row.getCell(CURRENCYRATE).setCellValue(sale.currencyRate.toDouble())
 
@@ -81,7 +86,7 @@ class Exporter {
             saleProceedsCell.cellFormula = "${COST[r]}*${CURRENCYRATE[r]}"
 
             val saleExpensesCell = row.getCell(SALEEXPENSES)
-            saleExpensesCell.cellFormula = "SUM(${EXPENSES[firstPurchaseRowNum]}:${EXPENSES[r - 1]}) + " +
+            saleExpensesCell.cellFormula = "SUM(${EXPENSES[firstPurchaseRowNum[sheetIndex]]}:${EXPENSES[r - 1]}) + " +
                     "${COMMISSION[r]}*${CURRENCYRATE[r]}"
 
             val pnlCell = row.getCell(PNL)
@@ -90,34 +95,37 @@ class Exporter {
             val taxCell = row.getCell(TAX)
             taxCell.cellFormula = "${PNL[r]}*13%"
 
-            sheet.createRow(currentRowNum++)
-            firstPurchaseRowNum = currentRowNum
+            sheet.createRow(currentRowNum[sheetIndex]++)
+            firstPurchaseRowNum[sheetIndex] = currentRowNum[sheetIndex]
         }
 
         fun addSummary() {
-            val summaryRow = sheet.createRow(sheet.lastRowNum + 1)
-            summaryColumnsStyles.forEachIndexed { i, style ->
-                summaryRow.createCell(i).cellStyle = style
+            for (sheetIndex in (0 until workbook.numberOfSheets)) {
+                val sheet = workbook.getSheetAt(sheetIndex)
+                val summaryRow = sheet.createRow(sheet.lastRowNum + 1)
+                summaryColumnsStyles.forEachIndexed { i, style ->
+                    summaryRow.createCell(i).cellStyle = style
+                }
+
+                val summaryCaptionCell = summaryRow.getCell(0)
+                summaryCaptionCell.setCellValue(summaryRowCaption)
+
+                val r = summaryRow.rowNum
+
+                val saleProceedsCell = summaryRow.getCell(SALEPROCEEDS)
+                saleProceedsCell.cellFormula = "SUM(${SALEPROCEEDS[1]}:${SALEPROCEEDS[r - 1]})"
+
+                val saleExpensesCell = summaryRow.getCell(SALEEXPENSES)
+                saleExpensesCell.cellFormula = "SUM(${SALEEXPENSES[1]}:${SALEEXPENSES[r - 1]})"
+
+                val pnlCell = summaryRow.getCell(PNL)
+                pnlCell.cellFormula = "SUM(${PNL[1]}:${PNL[r - 1]})"
+
+                val taxCell = summaryRow.getCell(TAX)
+                taxCell.cellFormula = "SUM(${TAX[1]}:${TAX[r - 1]})"
+
+                formulaEvaluator.evaluateAll()
             }
-
-            val summaryCaptionCell = summaryRow.getCell(0)
-            summaryCaptionCell.setCellValue(summaryRowCaption)
-
-            val r = summaryRow.rowNum
-
-            val saleProceedsCell = summaryRow.getCell(SALEPROCEEDS)
-            saleProceedsCell.cellFormula = "SUM(${SALEPROCEEDS[1]}:${SALEPROCEEDS[r - 1]})"
-
-            val saleExpensesCell = summaryRow.getCell(SALEEXPENSES)
-            saleExpensesCell.cellFormula = "SUM(${SALEEXPENSES[1]}:${SALEEXPENSES[r - 1]})"
-
-            val pnlCell = summaryRow.getCell(PNL)
-            pnlCell.cellFormula = "SUM(${PNL[1]}:${PNL[r - 1]})"
-
-            val taxCell = summaryRow.getCell(TAX)
-            taxCell.cellFormula = "SUM(${TAX[1]}:${TAX[r - 1]})"
-
-            formulaEvaluator.evaluateAll()
         }
 
         fun write(file: File) {
