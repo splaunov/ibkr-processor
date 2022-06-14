@@ -82,6 +82,9 @@ class Exporter {
 
             val r = row.rowNum
 
+            val saleProceedsUsdCell = row.getCell(SALEPROCEEDS_USD)
+            saleProceedsUsdCell.cellFormula = COST[r]
+
             val saleProceedsCell = row.getCell(SALEPROCEEDS)
             saleProceedsCell.cellFormula = "${COST[r]}*${CURRENCYRATE[r]}"
 
@@ -111,6 +114,9 @@ class Exporter {
                 summaryCaptionCell.setCellValue(summaryRowCaption)
 
                 val r = summaryRow.rowNum
+
+                val saleProceedsUsdCell = summaryRow.getCell(SALEPROCEEDS_USD)
+                saleProceedsUsdCell.cellFormula = "SUM(${SALEPROCEEDS_USD[1]}:${SALEPROCEEDS_USD[r - 1]})"
 
                 val saleProceedsCell = summaryRow.getCell(SALEPROCEEDS)
                 saleProceedsCell.cellFormula = "SUM(${SALEPROCEEDS[1]}:${SALEPROCEEDS[r - 1]})"
@@ -157,10 +163,11 @@ class Exporter {
             COMMISSION(5, "F"),
             CURRENCYRATE(6, "G"),
             EXPENSES(7, "H"),
-            SALEPROCEEDS(8, "I"),
-            SALEEXPENSES(9, "J"),
-            PNL(10, "K"),
-            TAX(11, "L");
+            SALEPROCEEDS_USD(8, "I"),
+            SALEPROCEEDS(9, "J"),
+            SALEEXPENSES(10, "K"),
+            PNL(11, "L"),
+            TAX(12, "M");
 
             fun coordinates(rowNum: Int): String = "$symbol${rowNum + 1}"
             operator fun get(rowNum: Int): String = coordinates(rowNum)
