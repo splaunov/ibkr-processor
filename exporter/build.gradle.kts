@@ -26,6 +26,10 @@ dependencies {
     implementation(Other.poiOoxml)
 
     implementation(project(":data"))
+    implementation(project(":reader"))
 
+    // Testing
     testImplementation(Kotest.assertions)
+    testImplementation(Other.mockk)
+    testImplementation(JUnit.jupiterParams)
 }

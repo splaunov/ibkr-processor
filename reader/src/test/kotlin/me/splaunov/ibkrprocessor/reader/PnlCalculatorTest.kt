@@ -3,24 +3,25 @@ package me.splaunov.ibkrprocessor.reader
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import me.splaunov.ibkrprocessor.data.PurchaseOperationDetails
-import me.splaunov.ibkrprocessor.data.SellOperationDetails
+import me.splaunov.ibkrprocessor.data.PurchaseDetails
+import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
+import me.splaunov.ibkrprocessor.processor.PnlCalculator
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
-import java.time.LocalDate
+import java.time.Instant
 
 class PnlCalculatorTest {
     private val currencyRatesProvider = mockk<CurrencyRatesProvider>().apply {
-        every { getRate(any()) } returns 70f
+        every { getRate(any(), any()) } returns 70f
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource
     fun calculateRealizedPnlRub(
         @Suppress("UNUSED_PARAMETER") caseDescription: String,
-        sellOperations: List<SellOperationDetails>, expected: Float
+        sellOperations: List<SellingDetails>, expected: Float,
     ) {
         val actual = PnlCalculator(currencyRatesProvider).calculateRealizedPnlRub(sellOperations)
 
@@ -33,13 +34,13 @@ class PnlCalculatorTest {
             "two symbols",
             listOf(
                 sellOperationDetails(
-                    "AAPL", "2020-12-10", -6,
-                    purchaseOperationDetails("AAPL", "2020-12-05", 5, 5),
-                    purchaseOperationDetails("AAPL", "2020-12-06", 4, 1),
+                    "AAPL", 20, -6F, 100F,
+                    purchaseOperationDetails("AAPL", 0, 5F, 5F),
+                    purchaseOperationDetails("AAPL", 10, 4F, 1F),
                 ),
                 sellOperationDetails(
-                    "AMZN", "2020-12-11", -1,
-                    purchaseOperationDetails("AMZN", "2020-12-05", 10, 1)
+                    "AMZN", 30, -1F, 100F,
+                    purchaseOperationDetails("AMZN", 0, 10F, 1F)
                 )
             ),
             -(-6 * 100f + 1f) * 70f - (5 * 100f + 1f) * 70f - (4 * 100f + 1f) * 70f * 1 / 4 +
@@ -49,27 +50,39 @@ class PnlCalculatorTest {
 
     private fun tradeUsd(
         symbol: String,
-        date: String,
-        quantity: Int,
-    ): TradeOrder {
-        return TradeOrder(
-            symbol,
-            "USD",
-            LocalDate.parse(date),
-            quantity,
-            100f,
-            -1f
-        )
-    }
+        tradeTimeInSeconds: Int,
+        quantity: Float,
+        price: Float = 100F,
+    ) = TradeOrder(
+        symbol,
+        "USD",
+        Instant.parse("2020-08-20T00:00:00Z").plusSeconds(tradeTimeInSeconds.toLong()),
+        quantity,
+        price,
+        -1f
+    )
 
+    private fun stockSplitUsd(
+        symbol: String,
+        splitTimeInSeconds: Int,
+        multiplier: Int,
+    ) = CorporateAction(
+        StockSplit(
+            symbol,
+            Instant.parse("2020-08-20T00:00:00Z").plusSeconds(splitTimeInSeconds.toLong()),
+            multiplier
+        )
+    )
 
     @ParameterizedTest(name = "{0}")
     @MethodSource
     fun getSellDetails(
         @Suppress("UNUSED_PARAMETER") caseDescription: String,
-        trades: List<TradeOrder>, expected: List<SellOperationDetails>
+        trades: List<TradeOrder>,
+        actions: List<CorporateAction>,
+        expected: List<SellingDetails>,
     ) {
-        val actual = PnlCalculator(currencyRatesProvider).getSellDetails(trades)
+        val actual = PnlCalculator(currencyRatesProvider).getSellingDetails(trades, actions)
 
         actual shouldBe expected
     }
@@ -79,74 +92,99 @@ class PnlCalculatorTest {
         Arguments.of(
             "simple buy and sell",
             listOf(
-                tradeUsd("AAPL", "2020-12-05", 5),
-                tradeUsd("AAPL", "2020-12-10", -5),
+                tradeUsd("AAPL", 0, 5F),
+                tradeUsd("AAPL", 10, -5F),
             ),
+            listOf<CorporateAction>(),
             listOf(
                 sellOperationDetails(
-                    "AAPL", "2020-12-10", -5,
-                    purchaseOperationDetails("AAPL", "2020-12-05", 5, 5)
+                    "AAPL", 10, -5F, 100F,
+                    purchaseOperationDetails("AAPL", 0, 5F, 5F)
                 )
             )
         ),
         Arguments.of(
             "partial sell",
             listOf(
-                tradeUsd("AAPL", "2020-12-05", 5),
-                tradeUsd("AAPL", "2020-12-06", 4),
-                tradeUsd("AAPL", "2020-12-10", -6),
+                tradeUsd("AAPL", 0, 5F),
+                tradeUsd("AAPL", 10, 4F),
+                tradeUsd("AAPL", 20, -6F),
             ),
+            listOf<CorporateAction>(),
             listOf(
                 sellOperationDetails(
-                    "AAPL", "2020-12-10", -6,
-                    purchaseOperationDetails("AAPL", "2020-12-05", 5, 5),
-                    purchaseOperationDetails("AAPL", "2020-12-06", 4, 1),
+                    "AAPL", 20, -6F, 100F,
+                    purchaseOperationDetails("AAPL", 0, 5F, 5F),
+                    purchaseOperationDetails("AAPL", 10, 4F, 1F),
                 )
             )
         ),
         Arguments.of(
             "two symbols",
             listOf(
-                tradeUsd("AAPL", "2020-12-05", 5),
-                tradeUsd("AAPL", "2020-12-06", 4),
-                tradeUsd("AAPL", "2020-12-10", -6),
-                tradeUsd("AMZN", "2020-12-05", 10),
-                tradeUsd("AMZN", "2020-12-11", -1),
+                tradeUsd("AAPL", 0, 5F),
+                tradeUsd("AAPL", 10, 4F),
+                tradeUsd("AAPL", 20, -6F),
+                tradeUsd("AMZN", 0, 10F),
+                tradeUsd("AMZN", 30, -1F),
+            ),
+            listOf<CorporateAction>(),
+            listOf(
+                sellOperationDetails(
+                    "AAPL", 20, -6F, 100F,
+                    purchaseOperationDetails("AAPL", 0, 5F, 5F),
+                    purchaseOperationDetails("AAPL", 10, 4F, 1F),
+                ),
+                sellOperationDetails(
+                    "AMZN", 30, -1F, 100F,
+                    purchaseOperationDetails("AMZN", 0, 10F, 1F)
+                )
+            )
+        ),
+        Arguments.of(
+            "with split",
+            listOf(
+                tradeUsd("TSLA", 0, 1F, 100F),
+                tradeUsd("TSLA", 20, 5F, 22F),
+                tradeUsd("TSLA", 30, -10F, 25F),
+            ),
+            listOf<CorporateAction>(
+                stockSplitUsd("TSLA", 10, 5)
             ),
             listOf(
                 sellOperationDetails(
-                    "AAPL", "2020-12-10", -6,
-                    purchaseOperationDetails("AAPL", "2020-12-05", 5, 5),
-                    purchaseOperationDetails("AAPL", "2020-12-06", 4, 1),
-                ),
-                sellOperationDetails(
-                    "AMZN", "2020-12-11", -1,
-                    purchaseOperationDetails("AMZN", "2020-12-05", 10, 1)
+                    "TSLA", 30, -10F, 25F,
+                    purchaseOperationDetails("TSLA", 0, 5F, 5F, 20F),
+                    purchaseOperationDetails("TSLA", 20, 5F, 5F, 22F),
                 )
             )
         ),
     )
 
+    fun adjustPurchaseBySplits() {
+
+    }
+
     private fun sellOperationDetails(
         symbol: String,
-        date: String,
-        quantity: Int,
-        vararg purchaseOperationDetails: PurchaseOperationDetails
-    ): SellOperationDetails = SellOperationDetails(
-        tradeUsd(symbol, date, quantity),
-        70f,
-        purchaseOperationDetails.toList()
+        sellTimeInSeconds: Int,
+        quantity: Float,
+        price: Float,
+        vararg purchaseDetails: PurchaseDetails,
+    ): SellingDetails = SellingDetails(
+        tradeUsd(symbol, sellTimeInSeconds, quantity, price),
+        purchaseDetails.toList()
     )
 
     private fun purchaseOperationDetails(
         symbol: String,
-        date: String,
-        quantity: Int,
-        quantitySold: Int
-    ): PurchaseOperationDetails =
-        PurchaseOperationDetails(
-            tradeUsd(symbol, date, quantity),
-            70f,
+        purchaseTimeInSeconds: Int,
+        quantity: Float,
+        quantitySold: Float,
+        purchasePrice: Float = 100F,
+    ): PurchaseDetails =
+        PurchaseDetails(
+            tradeUsd(symbol, purchaseTimeInSeconds, quantity, purchasePrice),
             quantitySold
         )
 }

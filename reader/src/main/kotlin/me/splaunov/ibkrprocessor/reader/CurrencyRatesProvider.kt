@@ -17,7 +17,7 @@ interface CentralBankHttpClient {
 class CurrencyRatesProvider(private val httpClient: CentralBankHttpClient) {
     private val centralBankRates = mutableMapOf<LocalDate, List<CurrencyRate>>()
 
-    fun getRate(date: LocalDate, symbol: String = "USD"): Float =
+    fun getRate(date: LocalDate, symbol: String = "USD") =
         getRates(date).first { it.charCode == symbol }.value
 
     private fun getRates(date: LocalDate): List<CurrencyRate> =

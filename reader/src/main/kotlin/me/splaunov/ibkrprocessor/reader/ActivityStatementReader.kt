@@ -1,12 +1,20 @@
 package me.splaunov.ibkrprocessor.reader
 
 import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
+import jakarta.inject.Singleton
 import me.splaunov.ibkrprocessor.data.Dividend
 import me.splaunov.ibkrprocessor.data.TradeOrder
-import me.splaunov.ibkrprocessor.reader.TradeOrderFields.*
+import me.splaunov.ibkrprocessor.reader.TradeOrderFields.COMMISSION
+import me.splaunov.ibkrprocessor.reader.TradeOrderFields.CURRENCY
+import me.splaunov.ibkrprocessor.reader.TradeOrderFields.DATE
+import me.splaunov.ibkrprocessor.reader.TradeOrderFields.PRICE
+import me.splaunov.ibkrprocessor.reader.TradeOrderFields.QUANTITY
+import me.splaunov.ibkrprocessor.reader.TradeOrderFields.SYMBOL
 import java.io.File
-import java.time.LocalDate
-import jakarta.inject.Singleton
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * Reads blocks of information from the IBKR Activity statement.
@@ -16,35 +24,25 @@ class ActivityStatementReader {
 
     /**
      * Reads trade orders' data.
-     * Quantity and prices are adjusted according to stock splits if applicable.
      *
      * @param dir Directory from which activity statement files should be read.
-     * @return List of trade orders adjusted according to splits.
+     * @return List of trade orders.
      */
     fun readTrades(dir: File): List<TradeOrder> {
-        val stockSplits = readCorporateActions(dir)
         val trades = mutableListOf<TradeOrder>()
 
-        dir.listFiles { f -> f.extension == "csv" }.forEach { file ->
+        dir.listFiles { f -> f.extension == "csv" }?.forEach { file ->
             csvReader().open(file) {
                 var record = readNext()
                 while (record != null) {
                     if (record[0] == "Trades" && record[1] == "Data" && record[2] == "Order" && record[3] == "Stocks") {
-                        val date = LocalDate.parse(record[DATE].take(10))
-                        val splitMultiplier = getSplitMultiplier(stockSplits, record[SYMBOL], date)
-                        var quantity = record[QUANTITY].toInt()
-                        var price = record[PRICE].toFloat()
-                        if (splitMultiplier != null) {
-                            price /= splitMultiplier
-                            quantity *= splitMultiplier
-                        }
                         trades.add(
                             TradeOrder(
                                 record[SYMBOL],
                                 record[CURRENCY],
-                                date,
-                                quantity,
-                                price,
+                                record[DATE].toInstant(),
+                                record[QUANTITY].toFloat(),
+                                record[PRICE].toFloat(),
                                 record[COMMISSION].toFloat()
                             )
                         )
@@ -60,19 +58,23 @@ class ActivityStatementReader {
     /**
      * Reads info regarding stocks splits.
      */
-    fun readCorporateActions(dir: File): List<StockSplit> {
-        val splits = mutableListOf<StockSplit>()
-        val acquisitions = mutableListOf<Acquisition>()
-        dir.listFiles { f -> f.extension == "csv" }.forEach { file ->
+    fun readCorporateActions(dir: File): List<CorporateAction> {
+        val actions = mutableListOf<CorporateAction>()
+        dir.listFiles { f -> f.extension == "csv" }?.forEach { file ->
             csvReader().open(file) {
                 var record = readNext()
                 while (record != null) {
                     if (record[0] == "Corporate Actions" && record[1] == "Data" && record[2] == "Stocks") {
-                        val date = LocalDate.parse(record[CorporateActionFields.DATE].take(10))
+                        val date = record[CorporateActionFields.DATE].toInstant()
                         val description = record[CorporateActionFields.DESCRIPTION]
                         when {
-                            description.contains("Split") -> splits.add(readSplit(record, date))
-                            description.contains("Acquisition") -> acquisitions.add(readAcquisition(record, date))
+                            description.contains("Split") -> actions.add(CorporateAction(readSplit(record, date)))
+                            description.contains("Acquisition") ->
+                                actions.add(CorporateAction(readAcquisition(record, readNext(), date)))
+
+                            description.contains("CUSIP/ISIN Change") ->
+                                actions.add(CorporateAction(readIsinChange(record, readNext(), date)))
+
                             else -> throw IllegalStateException("Unknown corporate event: $record")
                         }
                     }
@@ -80,15 +82,38 @@ class ActivityStatementReader {
                 }
             }
         }
-        return splits
+        return actions
     }
 
-    private fun readAcquisition(record: List<String>, date: LocalDate): Acquisition {
-        //TODO Implement parsing of acquisition info
-        return Acquisition("TODO", date)
+    private fun readAcquisition(firstRecord: List<String>, secondRecord: List<String>?, date: Instant): Acquisition {
+        checkNotNull(secondRecord) { "Missed second record of acquisition event" }
+        val regex = """^(.+)\(.+\) .+\(Acquisition\) .+\((.+), .+, .+\)$""".toRegex()
+        val firstMatch = regex.matchEntire(firstRecord[CorporateActionFields.DESCRIPTION])
+            ?: throw IllegalStateException("Unknown corporate action: ${firstRecord[CorporateActionFields.DESCRIPTION]}")
+        val secondMatch = regex.matchEntire(secondRecord[CorporateActionFields.DESCRIPTION])
+            ?: throw IllegalStateException("Unknown corporate action: ${secondRecord[CorporateActionFields.DESCRIPTION]}")
+        check(secondMatch.groupValues[1] != secondMatch.groupValues[2]) {
+            "Error parsing acquisition description: ${secondRecord[CorporateActionFields.DESCRIPTION]}"
+        }
+
+        return Acquisition(
+            date,
+            firstMatch.groupValues[2].split(".", limit = 1).last(), //e.g. QDEL.OLD
+            firstRecord[CorporateActionFields.QUANTITY].toFloat(),
+            firstRecord[CorporateActionFields.PROCEEDS].toFloat(),
+            secondMatch.groupValues[2].split(".", limit = 1).last(),
+            secondRecord[CorporateActionFields.QUANTITY].toFloat(),
+            secondRecord[CorporateActionFields.PROCEEDS].toFloat(),
+        )
     }
 
-    private fun readSplit(record: List<String>, date: LocalDate): StockSplit {
+    private fun readIsinChange(firstRecord: List<String>, secondRecord: List<String>?, date: Instant): IsinChange {
+        checkNotNull(secondRecord) { "Missed second record of ISIN change event" }
+        //TODO Implement parsing of ISIN change info
+        return IsinChange(date, "TODO.old", 0F, "TODO.new", 0F)
+    }
+
+    private fun readSplit(record: List<String>, date: Instant): StockSplit {
         val regex = """^(\D+)\(\w+\) Split (\d+) for (\d+) \(\1, \D+, \w+\)""".toRegex()
         val match = regex.matchEntire(record[CorporateActionFields.DESCRIPTION])
             ?: throw IllegalStateException("Unknown corporate event: $record")
@@ -96,11 +121,10 @@ class ActivityStatementReader {
             throw IllegalStateException("Unknown corporate event: $record")
         return StockSplit(match.groupValues[1], date, match.groupValues[2].toInt())
     }
-
-    private fun getSplitMultiplier(splits: List<StockSplit>, symbol: String, date: LocalDate): Int? =
-        splits.firstOrNull { it.symbol == symbol && date < it.date }?.multiplier
-
 }
+
+private fun String.toInstant(): Instant =
+    LocalDateTime.parse(this, DateTimeFormatter.ofPattern("uuuu-M-d, HH:mm:ss")).atZone(ZoneId.of("UTC")).toInstant()
 
 fun readDividends(file: File): List<Dividend> {
     TODO("Implement dividends reader")
@@ -122,6 +146,8 @@ private operator fun List<String>.get(field: TradeOrderFields): String {
 enum class CorporateActionFields(val index: Int) {
     DATE(5),
     DESCRIPTION(6),
+    QUANTITY(7),
+    PROCEEDS(8),
 }
 
 private operator fun List<String>.get(field: CorporateActionFields): String {

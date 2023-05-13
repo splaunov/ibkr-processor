@@ -3,7 +3,7 @@ package me.splaunov.ibkrprocessor.cli
 import io.micronaut.configuration.picocli.PicocliRunner
 import me.splaunov.ibkrprocessor.exporter.Exporter
 import me.splaunov.ibkrprocessor.reader.ActivityStatementReader
-import me.splaunov.ibkrprocessor.reader.PnlCalculator
+import me.splaunov.ibkrprocessor.processor.PnlCalculator
 import picocli.CommandLine.Command
 import picocli.CommandLine.Parameters
 import java.io.File
@@ -24,14 +24,20 @@ class Application : Runnable {
     @Inject
     lateinit var pnlCalculator: PnlCalculator
 
+    @Inject
+    lateinit var exporter: Exporter
+
     override fun run() {
         println(inCsvDir.absolutePath)
         if (inCsvDir.isFile) {
             println("First parameter should be a directory")
             exitProcess(1)
         }
-        val sellDetails = pnlCalculator.getSellDetails(reader.readTrades(inCsvDir))
-        Exporter().export(sellDetails, outXlsxFile)
+        val sellDetails = pnlCalculator.getSellingDetails(
+            reader.readTrades(inCsvDir),
+            reader.readCorporateActions(inCsvDir)
+        )
+        exporter.export(sellDetails, outXlsxFile)
         val pnl = pnlCalculator.calculateRealizedPnlRub(sellDetails)
         println("PnL: $pnl")
     }

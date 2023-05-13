@@ -9,6 +9,8 @@
         </encoder>
     </appender>
 
+    <logger name="me.splaunov.ibkrprocessor" level="DEBUG"/>
+
     <root level="info">
         <appender-ref ref="STDOUT" />
     </root>

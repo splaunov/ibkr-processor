@@ -163,6 +163,8 @@ Trades,SubTotal,,Stocks,USD,DIS,,30,,,-4322.6,-2,4324.6,0,38.7,
 Trades,Data,Order,Stocks,USD,DOYU,"2021-11-18, 11:35:56",100,13.555,13.57,-1355.5,-1,1356.5,0,1.5,O
 Trades,Data,Order,Stocks,USD,DOYU,"2021-11-30, 13:36:10",100,13.2715,13.26,-1327.15,-1,1328.15,0,-1.15,O;P
 Trades,SubTotal,,Stocks,USD,DOYU,,200,,,-2682.65,-2,2684.65,0,0.35,
+Trades,Data,Order,Stocks,USD,AZN,"2022-11-03, 09:30:02",-8.4972,58.960585134,59.93,500.999884,-1.012577533,-491.074431,8.912876,-8.2373,C;FPA;P
+Trades,SubTotal,,Stocks,USD,AZN,,-8.4972,,,500.999884,-1.012577533,-491.074431,8.912876,-8.2373,
 Trades,Total,,Stocks,USD,,,,,,-7574.1505,-135.328994297,8111.822,523.342508,562.0495,
 Trades,Header,DataDiscriminator,Asset Category,Currency,Symbol,Date/Time,Quantity,T. Price,,Proceeds,Comm in USD,,,MTM in USD,Code
 Trades,Data,Order,Forex,RUB,USD.RUB,"2021-07-28, 08:47:41",137,72.4813,,-9929.9381,-2,,,0.086013,
@@ -174,6 +176,10 @@ Trades,Total,,Forex,USD,,,,,,-13561.230184373,-42,,,20.769815,
 Corporate Actions,Header,Asset Category,Currency,Report Date,Date/Time,Description,Quantity,Proceeds,Value,Realized P/L,Code
 Corporate Actions,Data,Stocks,USD,2021-07-21,"2021-07-20, 20:25:00","ALXN(US0153511094) Cash and Stock Merger (Acquisition) US0463531089 21243 FOR 10000 AND USD 60.00 (ALXN, ALEXION PHARMACEUTICALS INC, US0153511094)",-4,240,-730,96.514431,
 Corporate Actions,Data,Stocks,USD,2021-07-21,"2021-07-20, 20:25:00","ALXN(US0153511094) Cash and Stock Merger (Acquisition) US0463531089 21243 FOR 10000 AND USD 60.00 (AZN, ASTRAZENECA PLC-SPONS ADR, US0463531089)",8.4972,0,490.883244,0,
+Corporate Actions,Data,Stocks,USD,2022-04-11,"2022-04-08, 20:25:00","DISCA(US25470F1049) CUSIP/ISIN Change to (US9344231041) (DISCA.OLD, DISCOVERY INC - A, US25470F1049)",-50,0,0,0,
+Corporate Actions,Data,Stocks,USD,2022-04-11,"2022-04-08, 20:25:00","DISCA(US25470F1049) CUSIP/ISIN Change to (US9344231041) (WBD, WARNER BROS DISCOVERY INC, US9344231041)",50,0,0,0,
+Corporate Actions,Data,Stocks,USD,2022-05-27,"2022-05-26, 20:25:00","20220526175403QDEL(US74838J1016) Merged(Acquisition) WITH US2197981051 1 FOR 1 (QDEL, QUIDELORTHO CORP, US2197981051)",10,0,1034.5,0,
+Corporate Actions,Data,Stocks,USD,2022-05-27,"2022-05-26, 20:25:00","20220526175403QDEL(US74838J1016) Merged(Acquisition) WITH US2197981051 1 FOR 1 (QDEL.OLD, QUIDEL CORP, US74838J1016)",-10,0,-996,0,
 Corporate Actions,Data,Total,,,,,,240,-239.116756,96.514431,
 Deposits & Withdrawals,Header,Currency,Settle Date,Description,Amount
 Deposits & Withdrawals,Data,RUB,2021-07-28,Electronic Fund Transfer,10000

@@ -1,32 +1,36 @@
 package me.splaunov.ibkrprocessor.exporter
 
-import me.splaunov.ibkrprocessor.data.PurchaseOperationDetails
-import me.splaunov.ibkrprocessor.data.SellOperationDetails
+import me.splaunov.ibkrprocessor.data.PurchaseDetails
+import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
 import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.*
 import org.apache.poi.xssf.usermodel.*
 import java.io.File
 import java.io.FileOutputStream
 import jakarta.inject.Singleton
+import me.splaunov.ibkrprocessor.data.toLocalDate
+import me.splaunov.ibkrprocessor.reader.CurrencyRatesProvider
 
 @Singleton
-class Exporter {
+class Exporter(
+    private val currencyRatesProvider: CurrencyRatesProvider,
+) {
 
-    fun export(saleOperations: List<SellOperationDetails>, file: File) {
-        val template = TemplateHandler()
-        saleOperations.forEach { saleOp ->
-            saleOp.purchases.forEach { template.addPurchase(saleOp.sellOrder.date.year, it) }
+    fun export(saleOperations: List<SellingDetails>, file: File) {
+        val template = TemplateHandler(currencyRatesProvider)
+        saleOperations.sortedBy { it.sellOrder.symbol }.forEach { saleOp ->
+            saleOp.purchases.forEach { template.addPurchase(saleOp.sellOrder.date.toLocalDate().year, it) }
             template.addSale(saleOp)
         }
         template.addSummary()
         template.write(file)
     }
 
-    private class TemplateHandler {
+    private class TemplateHandler(private val currencyRatesProvider: CurrencyRatesProvider) {
         private val workbook: XSSFWorkbook
         private val formulaEvaluator: XSSFFormulaEvaluator
-        private var currentRowNum = arrayOf(1, 1)
-        private var firstPurchaseRowNum = arrayOf(1, 1)
+        private var currentRowNum = arrayOf(1, 1, 1)
+        private var firstPurchaseRowNum = arrayOf(1, 1, 1)
         private val summaryRowCaption: String
         private val dataColumnsStyles: Array<XSSFCellStyle?>
         private val summaryColumnsStyles: Array<XSSFCellStyle?>
@@ -54,10 +58,11 @@ class Exporter {
         }
 
         private fun getSheet(name: String): XSSFSheet {
-            return workbook.getSheet(name) ?: throw IllegalStateException("Sheet with name '$name' not found in the template.")
+            return workbook.getSheet(name)
+                ?: throw IllegalStateException("Sheet with name '$name' not found in the template.")
         }
 
-        fun addPurchase(sellYear: Int, purchase: PurchaseOperationDetails) {
+        fun addPurchase(sellYear: Int, purchase: PurchaseDetails) {
             val sheet = getSheet(sellYear.toString())
             val row = sheet.createRow(currentRowNum[workbook.indexOf(sheet)]++)
             createCells(row, purchase.purchaseOrder)
@@ -66,19 +71,26 @@ class Exporter {
             commissionCell.cellFormula =
                 "${purchase.purchaseOrder.commission}*${purchase.quantitySold}/${purchase.purchaseOrder.quantity}"
             row.getCell(QUANTITY).setCellValue(purchase.quantitySold.toDouble())
-            row.getCell(CURRENCYRATE).setCellValue(purchase.currencyRate.toDouble())
+            row.getCell(CURRENCYRATE).setCellValue(
+                currencyRatesProvider.getRate(
+                    purchase.purchaseOrder.date.toLocalDate(),
+                    purchase.purchaseOrder.currency
+                ).toDouble()
+            )
 
             val r = row.rowNum
             val expensesCell = row.getCell(EXPENSES)
             expensesCell.cellFormula = "(${COST[r]} + ${COMMISSION[r]})*${CURRENCYRATE[r]}"
         }
 
-        fun addSale(sale: SellOperationDetails) {
-            val sheet = getSheet(sale.sellOrder.date.year.toString())
+        fun addSale(sale: SellingDetails) {
+            val sheet = getSheet(sale.sellOrder.date.toLocalDate().year.toString())
             val sheetIndex = workbook.indexOf(sheet)
             val row = sheet.createRow(currentRowNum[sheetIndex]++)
             createCells(row, sale.sellOrder)
-            row.getCell(CURRENCYRATE).setCellValue(sale.currencyRate.toDouble())
+            row.getCell(CURRENCYRATE).setCellValue(
+                currencyRatesProvider.getRate(sale.sellOrder.date.toLocalDate(), sale.sellOrder.currency).toDouble()
+            )
 
             val r = row.rowNum
 
@@ -143,7 +155,7 @@ class Exporter {
                 row.createCell(i).cellStyle = style
             }
             row.getCell(SYMBOL).setCellValue(trade.symbol)
-            row.getCell(DATE).setCellValue(trade.date)
+            row.getCell(DATE).setCellValue(trade.date.toLocalDate())
             row.getCell(QUANTITY).setCellValue(trade.quantity.toDouble())
             row.getCell(PRICE).setCellValue(trade.price.toDouble())
 
@@ -177,7 +189,3 @@ class Exporter {
         private fun XSSFRow.getCell(column: Column): XSSFCell = getCell(column.index)
     }
 }
-
-
-
-

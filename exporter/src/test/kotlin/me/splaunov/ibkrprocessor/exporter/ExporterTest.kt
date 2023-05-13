@@ -2,45 +2,52 @@ package me.splaunov.ibkrprocessor.exporter
 
 import io.kotest.matchers.shouldBe
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
-import me.splaunov.ibkrprocessor.data.PurchaseOperationDetails
-import me.splaunov.ibkrprocessor.data.SellOperationDetails
+import io.mockk.every
+import io.mockk.mockk
+import me.splaunov.ibkrprocessor.data.PurchaseDetails
+import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
+import me.splaunov.ibkrprocessor.reader.CurrencyRatesProvider
 import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
-import java.time.LocalDate
+import java.time.Instant
 
 @MicronautTest
 class ExporterTest {
     @TempDir
     lateinit var tempDir: Path
 
+    private val currencyRatesProvider = mockk<CurrencyRatesProvider>().apply {
+        every { getRate(any(), any()) } returns 70f
+    }
+
     @Test
     fun export() {
         val file = tempDir.resolve("export.xlsx").toFile()
         val sellOps = listOf(
-            SellOperationDetails(
+            SellingDetails(
                 TradeOrder(
                     "AAPL", "USD",
-                    LocalDate.parse("2021-08-21"), -2, 490.54f, -1.0f
-                ), 73.7711f,
+                    Instant.parse("2021-08-21T00:00:00Z"), -2F, 490.54f, -1.0f
+                ),
                 listOf(
-                    PurchaseOperationDetails(
+                    PurchaseDetails(
                         TradeOrder(
                             "AAPL", "USD",
-                            LocalDate.parse("2020-08-20"), 4, 550.55f, -1.1f
-                        ), 75f, 2
+                            Instant.parse("2020-08-20T00:00:00Z"), 4F, 550.55f, -1.1f
+                        ), 2F
                     )
                 )
             )
         )
 
-        Exporter().export(sellOps, file)
+        Exporter(currencyRatesProvider).export(sellOps, file)
 
         file.exists() shouldBe true
         val sheet = XSSFWorkbook(file).getSheet("2021")
         sheet.getRow(1)?.getCell(0)?.stringCellValue shouldBe "AAPL"
-        sheet.getRow(4)?.getCell(0)?.stringCellValue shouldBe "Итого"
+        sheet.getRow(2)?.getCell(0)?.stringCellValue shouldBe "AAPL"
     }
 }
