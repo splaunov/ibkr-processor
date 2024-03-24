@@ -1,6 +1,6 @@
 plugins {
     id("common-conventions")
-    kotlin("kapt")
+    id("com.google.devtools.ksp") version PluginVersions.KSP
     kotlin("plugin.allopen")
     id("io.micronaut.library") version PluginVersions.MICRONAUT
 }
@@ -22,8 +22,6 @@ tasks {
 
 dependencies {
     // Micronaut Core
-    kapt(platform(Micronaut.bom))
-    kapt(Micronaut.inject)
     implementation(Micronaut.runtime)
     implementation(Micronaut.kotlinRuntime)
 
@@ -35,7 +33,10 @@ dependencies {
     implementation(project(":data"))
 
     // Testing
+    testImplementation(Micronaut.kotest)
+    testImplementation(Kotest.runner)
     testImplementation(Kotest.assertions)
+    testImplementation(Kotest.datatest)
     testImplementation(Other.mockk)
     testImplementation(JUnit.jupiterParams)
 }

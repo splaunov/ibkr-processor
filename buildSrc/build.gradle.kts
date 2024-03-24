@@ -6,7 +6,7 @@ repositories {
     mavenCentral()
 }
 
-val kotlin = "1.6.10"
+val kotlin = "1.9.23"
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin")

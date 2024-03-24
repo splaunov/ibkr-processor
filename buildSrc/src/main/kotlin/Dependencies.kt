@@ -1,28 +1,29 @@
 @file:Suppress("SpellCheckingInspection")
 
 object Versions {
-    const val MICRONAUT = "3.4.2"
+    const val MICRONAUT = "4.3.7"
     const val LOGBACK_ENCODER = "6.6"
     const val LOGBOOK = "2.13.0"
-    const val MOCKK = "1.12.0"
-    const val KOTEST = "4.6.3"
+    const val MOCKK = "1.13.10"
+    const val KOTEST = "5.8.1"
     const val KOTEST_WIRE_MOCK = "1.0.3"
     const val STRIKT = "0.32.0"
     const val TEST_CONTAINERS = "1.16.3"
     const val HIBERNATE_TYPES = "2.12.1"
-    const val KOTLIN_LOGGING = "2.0.10"
+    const val KOTLIN_LOGGING = "3.0.5"
     const val RESILIENCE_4_J = "1.7.1"
     const val CAFFEINE = "3.0.4"
-    const val PICOCLI = "4.6.3"
-    const val OPENCSV = "5.5.2"
-    const val KOTLIN_CSV = "1.2.0"
-    const val POI_OOXML = "5.2.2"
+    const val PICOCLI = "4.7.5"
+    const val OPENCSV = "5.9"
+    const val KOTLIN_CSV = "1.9.3"
+    const val POI_OOXML = "5.2.5"
 }
 
 object PluginVersions {
-    const val KOTLIN = "1.6.10"
-    const val SHADOW = "7.1.0"
-    const val MICRONAUT = "3.3.2"
+    const val KOTLIN = "1.9.23"
+    const val KSP = "1.9.23-1.0.19"
+    const val SHADOW = "8.1.1"
+    const val MICRONAUT = "4.3.5"
     const val GIT_PROPERTIES = "2.3.2"
     const val KT_LINT = "10.2.0"
     const val VERSIONS = "0.39.0"
@@ -51,12 +52,13 @@ object Micronaut {
     const val openApi = "io.micronaut.openapi:micronaut-openapi"
     const val tracing = "io.micronaut:micronaut-tracing"
     const val management = "io.micronaut:micronaut-management"
-    const val kotest = "io.micronaut.test:micronaut-test-kotest"
+    const val kotest = "io.micronaut.test:micronaut-test-kotest5"
     const val cache = "io.micronaut.cache:micronaut-cache-caffeine"
     const val picoCli = "io.micronaut.picocli:micronaut-picocli"
     const val viewsHandlebars = "io.micronaut.views:micronaut-views-handlebars"
     const val micrometerPrometheus = "io.micronaut.micrometer:micronaut-micrometer-registry-prometheus"
     const val jacksonXml = "io.micronaut.xml:micronaut-jackson-xml"
+    const val snakeYaml = "org.yaml:snakeyaml"
 }
 
 object Kotlin {
@@ -97,6 +99,7 @@ object Kotest {
     const val wireMock = "io.kotest.extensions:kotest-extensions-wiremock:${Versions.KOTEST_WIRE_MOCK}"
     const val runner = "io.kotest:kotest-runner-junit5-jvm:${Versions.KOTEST}"
     const val assertions = "io.kotest:kotest-assertions-core:${Versions.KOTEST}"
+    const val datatest = "io.kotest:kotest-framework-datatest:${Versions.KOTEST}"
 }
 
 object Testcontainers {

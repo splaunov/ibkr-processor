@@ -1,6 +1,6 @@
 plugins {
     id("common-conventions")
-    kotlin("kapt")
+    id("com.google.devtools.ksp") version PluginVersions.KSP
     kotlin("plugin.allopen")
     id("com.github.johnrengelman.shadow") version PluginVersions.SHADOW
     id("io.micronaut.application") version PluginVersions.MICRONAUT
@@ -16,12 +16,10 @@ micronaut {
 }
 
 dependencies {
-    kapt(platform(Micronaut.bom))
-    kapt(Other.picoCliCodeGen)
-    kapt(Micronaut.inject)
     implementation(Other.picoCli)
     implementation(Micronaut.picoCli)
     implementation(kotlin("reflect"))
+    runtimeOnly(Micronaut.snakeYaml)
 
     implementation(project(":reader"))
     implementation(project(":exporter"))
