@@ -1,26 +1,54 @@
 package me.splaunov.ibkrprocessor.exporter
 
+import jakarta.inject.Singleton
+import me.splaunov.ibkrprocessor.data.InstrumentInformation
 import me.splaunov.ibkrprocessor.data.PurchaseDetails
 import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
-import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.*
-import org.apache.poi.xssf.usermodel.*
+import me.splaunov.ibkrprocessor.data.toLocalDate
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.COMMISSION
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.COST
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.CURRENCYRATE
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.DATE
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.EXPENSES
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.PNL
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.PRICE
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.QUANTITY
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.SALEEXPENSES
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.SALEPROCEEDS
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.SALEPROCEEDS_USD
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.SECURITY_ID
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.SYMBOL
+import me.splaunov.ibkrprocessor.exporter.Exporter.TemplateHandler.Column.TAX
+import me.splaunov.ibkrprocessor.reader.CurrencyRatesProvider
+import mu.KotlinLogging
+import org.apache.poi.xssf.usermodel.XSSFCell
+import org.apache.poi.xssf.usermodel.XSSFCellStyle
+import org.apache.poi.xssf.usermodel.XSSFFormulaEvaluator
+import org.apache.poi.xssf.usermodel.XSSFRow
+import org.apache.poi.xssf.usermodel.XSSFSheet
+import org.apache.poi.xssf.usermodel.XSSFWorkbook
 import java.io.File
 import java.io.FileOutputStream
-import jakarta.inject.Singleton
-import me.splaunov.ibkrprocessor.data.toLocalDate
-import me.splaunov.ibkrprocessor.reader.CurrencyRatesProvider
 
 @Singleton
 class Exporter(
     private val currencyRatesProvider: CurrencyRatesProvider,
 ) {
+    private val logger = KotlinLogging.logger { }
 
-    fun export(saleOperations: List<SellingDetails>, file: File) {
+    fun export(
+        saleOperations: List<SellingDetails>,
+        file: File,
+        instrumentInformation: Map<String, InstrumentInformation>,
+    ) {
         val template = TemplateHandler(currencyRatesProvider)
         saleOperations.sortedBy { it.sellOrder.symbol }.forEach { saleOp ->
-            saleOp.purchases.forEach { template.addPurchase(saleOp.sellOrder.date.toLocalDate().year, it) }
-            template.addSale(saleOp)
+            logger.debug { "Adding sale $saleOp" }
+            val securityId = instrumentInformation[saleOp.sellOrder.symbol]?.securityId
+                ?: error("Instrument information not found: ${saleOp.sellOrder.symbol}")
+            saleOp.purchases.forEach { template.addPurchase(saleOp.sellOrder.date.toLocalDate().year, it, securityId) }
+            template.addSale(saleOp, securityId)
         }
         template.addSummary()
         template.write(file)
@@ -29,15 +57,15 @@ class Exporter(
     private class TemplateHandler(private val currencyRatesProvider: CurrencyRatesProvider) {
         private val workbook: XSSFWorkbook
         private val formulaEvaluator: XSSFFormulaEvaluator
-        private var currentRowNum = arrayOf(1, 1, 1)
-        private var firstPurchaseRowNum = arrayOf(1, 1, 1)
+        private var currentRowNum = arrayOf(1, 1, 1, 1)
+        private var firstPurchaseRowNum = arrayOf(1, 1, 1, 1)
         private val summaryRowCaption: String
         private val dataColumnsStyles: Array<XSSFCellStyle?>
         private val summaryColumnsStyles: Array<XSSFCellStyle?>
 
         init {
             val inStream = Exporter::class.java.getResourceAsStream("/template.xlsx")
-                ?: throw IllegalStateException("Template not found.")
+                ?: error("Template not found.")
             inStream.use { workbook = XSSFWorkbook(inStream) }
 
             formulaEvaluator = workbook.creationHelper.createFormulaEvaluator()
@@ -59,13 +87,13 @@ class Exporter(
 
         private fun getSheet(name: String): XSSFSheet {
             return workbook.getSheet(name)
-                ?: throw IllegalStateException("Sheet with name '$name' not found in the template.")
+                ?: error("Sheet with name '$name' not found in the template.")
         }
 
-        fun addPurchase(sellYear: Int, purchase: PurchaseDetails) {
+        fun addPurchase(sellYear: Int, purchase: PurchaseDetails, securityId: String) {
             val sheet = getSheet(sellYear.toString())
             val row = sheet.createRow(currentRowNum[workbook.indexOf(sheet)]++)
-            createCells(row, purchase.purchaseOrder)
+            createCells(row, purchase.purchaseOrder, securityId)
 
             val commissionCell = row.getCell(COMMISSION)
             commissionCell.cellFormula =
@@ -83,11 +111,11 @@ class Exporter(
             expensesCell.cellFormula = "(${COST[r]} + ${COMMISSION[r]})*${CURRENCYRATE[r]}"
         }
 
-        fun addSale(sale: SellingDetails) {
+        fun addSale(sale: SellingDetails, securityId: String) {
             val sheet = getSheet(sale.sellOrder.date.toLocalDate().year.toString())
             val sheetIndex = workbook.indexOf(sheet)
             val row = sheet.createRow(currentRowNum[sheetIndex]++)
-            createCells(row, sale.sellOrder)
+            createCells(row, sale.sellOrder, securityId)
             row.getCell(CURRENCYRATE).setCellValue(
                 currencyRatesProvider.getRate(sale.sellOrder.date.toLocalDate(), sale.sellOrder.currency).toDouble()
             )
@@ -102,7 +130,7 @@ class Exporter(
 
             val saleExpensesCell = row.getCell(SALEEXPENSES)
             saleExpensesCell.cellFormula = "SUM(${EXPENSES[firstPurchaseRowNum[sheetIndex]]}:${EXPENSES[r - 1]}) + " +
-                    "${COMMISSION[r]}*${CURRENCYRATE[r]}"
+                "${COMMISSION[r]}*${CURRENCYRATE[r]}"
 
             val pnlCell = row.getCell(PNL)
             pnlCell.cellFormula = "${SALEPROCEEDS[r]} + ${SALEEXPENSES[r]}"
@@ -150,11 +178,12 @@ class Exporter(
             FileOutputStream(file).use { workbook.write(it) }
         }
 
-        private fun createCells(row: XSSFRow, trade: TradeOrder) {
+        private fun createCells(row: XSSFRow, trade: TradeOrder, securityId: String) {
             dataColumnsStyles.forEachIndexed { i, style ->
                 row.createCell(i).cellStyle = style
             }
             row.getCell(SYMBOL).setCellValue(trade.symbol)
+            row.getCell(SECURITY_ID).setCellValue(securityId)
             row.getCell(DATE).setCellValue(trade.date.toLocalDate())
             row.getCell(QUANTITY).setCellValue(trade.quantity.toDouble())
             row.getCell(PRICE).setCellValue(trade.price.toDouble())
@@ -168,18 +197,19 @@ class Exporter(
 
         private enum class Column(val index: Int, val symbol: String) {
             SYMBOL(0, "A"),
-            DATE(1, "B"),
-            QUANTITY(2, "C"),
-            PRICE(3, "D"),
-            COST(4, "E"),
-            COMMISSION(5, "F"),
-            CURRENCYRATE(6, "G"),
-            EXPENSES(7, "H"),
-            SALEPROCEEDS_USD(8, "I"),
-            SALEPROCEEDS(9, "J"),
-            SALEEXPENSES(10, "K"),
-            PNL(11, "L"),
-            TAX(12, "M");
+            SECURITY_ID(1, "B"),
+            DATE(2, "C"),
+            QUANTITY(3, "D"),
+            PRICE(4, "E"),
+            COST(5, "F"),
+            COMMISSION(6, "G"),
+            CURRENCYRATE(7, "H"),
+            EXPENSES(8, "I"),
+            SALEPROCEEDS_USD(9, "J"),
+            SALEPROCEEDS(10, "K"),
+            SALEEXPENSES(11, "L"),
+            PNL(12, "M"),
+            TAX(13, "N");
 
             fun coordinates(rowNum: Int): String = "$symbol${rowNum + 1}"
             operator fun get(rowNum: Int): String = coordinates(rowNum)

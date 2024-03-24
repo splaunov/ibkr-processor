@@ -3,6 +3,7 @@ package me.splaunov.ibkrprocessor.reader
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import me.splaunov.ibkrprocessor.data.InstrumentInformation
 import me.splaunov.ibkrprocessor.data.PurchaseDetails
 import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
@@ -44,7 +45,7 @@ class PnlCalculatorTest {
                 )
             ),
             -(-6 * 100f + 1f) * 70f - (5 * 100f + 1f) * 70f - (4 * 100f + 1f) * 70f * 1 / 4 +
-                    -(-1 * 100f + 1f) * 70f - (10 * 100f + 1f) * 70f * 1 / 10
+                -(-1 * 100f + 1f) * 70f - (10 * 100f + 1f) * 70f * 1 / 10
         ),
     )
 
@@ -80,9 +81,14 @@ class PnlCalculatorTest {
         @Suppress("UNUSED_PARAMETER") caseDescription: String,
         trades: List<TradeOrder>,
         actions: List<CorporateAction>,
+        istrumentInformation: Map<String, InstrumentInformation>,
         expected: List<SellingDetails>,
     ) {
-        val actual = PnlCalculator(currencyRatesProvider).getSellingDetails(trades, actions)
+        val actual = PnlCalculator(currencyRatesProvider).getSellingDetails(
+            trades,
+            actions,
+            istrumentInformation
+        )
 
         actual shouldBe expected
     }
@@ -96,6 +102,7 @@ class PnlCalculatorTest {
                 tradeUsd("AAPL", 10, -5F),
             ),
             listOf<CorporateAction>(),
+            mapOf("AAPL" to InstrumentInformation("AAPL", "001")),
             listOf(
                 sellOperationDetails(
                     "AAPL", 10, -5F, 100F,
@@ -111,6 +118,7 @@ class PnlCalculatorTest {
                 tradeUsd("AAPL", 20, -6F),
             ),
             listOf<CorporateAction>(),
+            mapOf("AAPL" to InstrumentInformation("AAPL", "001")),
             listOf(
                 sellOperationDetails(
                     "AAPL", 20, -6F, 100F,
@@ -129,6 +137,10 @@ class PnlCalculatorTest {
                 tradeUsd("AMZN", 30, -1F),
             ),
             listOf<CorporateAction>(),
+            mapOf(
+                "AAPL" to InstrumentInformation("AAPL", "001"),
+                "AMZN" to InstrumentInformation("AMZN", "002"),
+            ),
             listOf(
                 sellOperationDetails(
                     "AAPL", 20, -6F, 100F,
@@ -151,6 +163,7 @@ class PnlCalculatorTest {
             listOf<CorporateAction>(
                 stockSplitUsd("TSLA", 10, 5)
             ),
+            mapOf("TSLA" to InstrumentInformation("TSLA", "001")),
             listOf(
                 sellOperationDetails(
                     "TSLA", 30, -10F, 25F,
@@ -160,10 +173,6 @@ class PnlCalculatorTest {
             )
         ),
     )
-
-    fun adjustPurchaseBySplits() {
-
-    }
 
     private fun sellOperationDetails(
         symbol: String,

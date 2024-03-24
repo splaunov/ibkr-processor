@@ -7,7 +7,7 @@ plugins {
 
 micronaut {
     version(Versions.MICRONAUT)
-    testRuntime("junit5")
+    testRuntime(io.micronaut.gradle.MicronautTestRuntime.KOTEST_5)
     processing {
         incremental(true)
         annotations("me.splaunov.ibkrprocessor.*")

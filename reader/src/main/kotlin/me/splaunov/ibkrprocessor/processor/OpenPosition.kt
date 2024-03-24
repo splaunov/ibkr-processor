@@ -17,9 +17,7 @@ data class OpenPosition(
         private set
 
     fun processPurchase(trade: TradeOrder) {
-        if (trade.isSelling()) {
-            throw IllegalArgumentException("Selling passed to processPurchase method")
-        }
+        require(!trade.isSelling()) { "Selling passed to processPurchase method" }
         validateTradeOrder(trade)
 
         purchases.add(PurchaseDetails(trade, 0F))
@@ -27,9 +25,7 @@ data class OpenPosition(
     }
 
     fun processSelling(trade: TradeOrder): SellingDetails {
-        if (!trade.isSelling()) {
-            throw IllegalArgumentException("Purchase passed to processSelling method")
-        }
+        require(trade.isSelling()) { "Purchase passed to processSelling method" }
         validateTradeOrder(trade)
 
         val purchaseOperationsDetails = mutableListOf<PurchaseDetails>()
@@ -37,10 +33,10 @@ data class OpenPosition(
         var purchase: PurchaseDetails = purchases.peek()
 
         do {
-            if (trade.date < purchase.purchaseOrder.date) throw IllegalStateException(
+            if (trade.date < purchase.purchaseOrder.date) error(
                 """Selling is earlier than purchase. Check the source data.
-                        |   Selling: $trade
-                        |   Purchase: $purchase""".trimMargin()
+                        |   Purchase: $purchase
+                        |   Selling: $trade""".trimMargin()
             )
             val s: Float
             val purchaseRemainder = purchase.purchaseOrder.quantity - purchase.quantitySold
@@ -62,7 +58,15 @@ data class OpenPosition(
             )
             if (purchase.purchaseOrder.quantity == purchase.quantitySold) {
                 purchases.remove()
-                purchase = purchases.peek() ?: break
+                purchase = purchases.peek() ?: if (quantitySold > 0) {
+                    error(
+                        """Selling is larger than purchase.
+                            |   Purchase: $purchase
+                            |   Selling: $trade""".trimMargin()
+                    )
+                } else {
+                    break
+                }
             }
         } while (quantitySold > 0)
 
@@ -72,12 +76,8 @@ data class OpenPosition(
     }
 
     fun processSplit(split: StockSplit) {
-        if (symbol != split.symbol) {
-            throw IllegalArgumentException("Expected $symbol but got ${split.symbol}")
-        }
-        if (lastProcessedOperationDate >= split.date) {
-            throw IllegalStateException("Split date is earlier than operation processed previously")
-        }
+        require(symbol == split.symbol) { "Expected $symbol but got ${split.symbol}" }
+        require(lastProcessedOperationDate < split.date) { "Split date is earlier than operation processed previously" }
 
         purchases.forEach {
             it.purchaseOrder.quantity *= split.multiplier
@@ -89,30 +89,25 @@ data class OpenPosition(
     }
 
     private fun validateTradeOrder(trade: TradeOrder) {
-        if (symbol != trade.symbol) {
-            throw IllegalArgumentException("Expected $symbol but got ${trade.symbol}")
-        }
-        if (currency != trade.currency) {
-            throw IllegalArgumentException("Expected $currency but got ${trade.currency}")
-        }
-        if (lastProcessedOperationDate >= trade.date) {
-            throw IllegalStateException("Trade order date is earlier than operation processed previously")
+        require(currency == trade.currency) { "Expected $currency but got ${trade.currency}" }
+        require(lastProcessedOperationDate < trade.date) {
+            "Trade order date is earlier than operation processed previously"
         }
     }
 
     fun processAcquisition(acquisition: Acquisition) {
-        if (symbol != acquisition.firstSymbol) {
-            throw IllegalArgumentException("Expected $symbol but got ${acquisition.firstSymbol}")
+        require(symbol == acquisition.firstSymbol) {
+            "Expected $symbol but got ${acquisition.firstSymbol}"
         }
-        if (lastProcessedOperationDate >= acquisition.date) {
-            throw IllegalStateException("Acquisition date is earlier than operation processed previously")
+        require(lastProcessedOperationDate < acquisition.date) {
+            "Acquisition date is earlier than operation processed previously"
         }
 
         purchases.forEach {
             val k = acquisition.secondQuantity / acquisition.firstQuantity
             it.purchaseOrder.quantity *= -k
             it.quantitySold *= -k
-            it.purchaseOrder.price += acquisition.firstProceeds/acquisition.firstQuantity
+            it.purchaseOrder.price += acquisition.firstProceeds / acquisition.firstQuantity
             it.purchaseOrder.price /= -k
             it.purchaseOrder.symbol = acquisition.secondSymbol
         }
@@ -120,4 +115,8 @@ data class OpenPosition(
         symbol = acquisition.secondSymbol
         lastProcessedOperationDate = acquisition.date
     }
+
+    fun isSold() =
+        purchases.isEmpty()
+            || purchases.size == 1 && purchases.peek().quantitySold == purchases.peek().purchaseOrder.quantity
 }

@@ -4,6 +4,7 @@ import io.kotest.matchers.shouldBe
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import io.mockk.every
 import io.mockk.mockk
+import me.splaunov.ibkrprocessor.data.InstrumentInformation
 import me.splaunov.ibkrprocessor.data.PurchaseDetails
 import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
@@ -26,6 +27,7 @@ class ExporterTest {
     @Test
     fun export() {
         val file = tempDir.resolve("export.xlsx").toFile()
+        val instrumentInformation = mapOf("AAPL" to InstrumentInformation("AAPL", "001"))
         val sellOps = listOf(
             SellingDetails(
                 TradeOrder(
@@ -43,7 +45,7 @@ class ExporterTest {
             )
         )
 
-        Exporter(currencyRatesProvider).export(sellOps, file)
+        Exporter(currencyRatesProvider).export(sellOps, file, instrumentInformation)
 
         file.exists() shouldBe true
         val sheet = XSSFWorkbook(file).getSheet("2021")

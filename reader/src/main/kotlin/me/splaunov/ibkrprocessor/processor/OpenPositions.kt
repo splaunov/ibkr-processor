@@ -1,38 +1,48 @@
 package me.splaunov.ibkrprocessor.processor
 
+import me.splaunov.ibkrprocessor.data.InstrumentInformation
 import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
 import me.splaunov.ibkrprocessor.reader.Acquisition
 import me.splaunov.ibkrprocessor.reader.CorporateAction
 import me.splaunov.ibkrprocessor.reader.StockSplit
 
-class OpenPositions {
+class OpenPositions(
+    private val instrumentInformation: Map<String, InstrumentInformation>,
+) {
     private val positions = mutableMapOf<String, OpenPosition>()
 
     fun getPositions(): Map<String, OpenPosition> = positions
+
     private fun processSplit(split: StockSplit) {
-        val position = positions[split.symbol]
-            ?: throw IllegalStateException("Could not process split as position is not open: ${split.symbol}")
+        val position = positions[getSecurityId(split.symbol)]
+            ?: error("Could not process split as position is not open: ${split.symbol}")
         position.processSplit(split)
     }
 
     fun processPurchase(trade: TradeOrder) {
-        val position = positions[trade.symbol] ?: OpenPosition(trade.symbol, trade.currency)
+        val securityId = getSecurityId(trade.symbol)
+        val position = positions[securityId] ?: OpenPosition(trade.symbol, trade.currency)
         position.processPurchase(trade)
-        positions[trade.symbol] = position
+        positions[securityId] = position
     }
 
     fun processSelling(trade: TradeOrder): SellingDetails {
-        val position = positions[trade.symbol]
-            ?: throw IllegalStateException("Could not process selling as position is not open: ${trade.symbol}")
-        return position.processSelling(trade)
+        val securityId = getSecurityId(trade.symbol)
+        val position = positions[securityId]
+            ?: error("Could not process selling as position is not open: ${trade.symbol}")
+        val sellingDetails = position.processSelling(trade)
+        if (position.isSold()) {
+            positions.remove(securityId)
+        }
+        return sellingDetails
     }
 
     private fun processAcquisition(acquisition: Acquisition) {
-        val position = positions.remove(acquisition.firstSymbol)
-            ?: throw IllegalStateException("Could not process acquisition as position is not open: ${acquisition.firstSymbol}")
+        val position = positions.remove(getSecurityId(acquisition.firstSymbol))
+            ?: error("Could not process acquisition as position is not open: ${acquisition.firstSymbol}")
         position.processAcquisition(acquisition)
-        positions[position.symbol] = position
+        positions[getSecurityId(position.symbol)] = position
     }
 
     fun processCorporateAction(action: CorporateAction) {
@@ -41,4 +51,8 @@ class OpenPositions {
             is Acquisition -> processAcquisition(action.details)
         }
     }
+
+    private fun getSecurityId(symbol: String): String =
+        instrumentInformation[symbol]?.securityId ?: error("Instrument information not found: $symbol")
+
 }

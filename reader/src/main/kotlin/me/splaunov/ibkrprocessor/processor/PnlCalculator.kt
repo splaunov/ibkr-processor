@@ -1,6 +1,7 @@
 package me.splaunov.ibkrprocessor.processor
 
 import jakarta.inject.Singleton
+import me.splaunov.ibkrprocessor.data.InstrumentInformation
 import me.splaunov.ibkrprocessor.data.SellingDetails
 import me.splaunov.ibkrprocessor.data.TradeOrder
 import me.splaunov.ibkrprocessor.data.toLocalDate
@@ -19,7 +20,7 @@ class PnlCalculator(private val currencyRatesProvider: CurrencyRatesProvider) {
      * @return Calculated PnL in RUB
      */
     fun calculateRealizedPnlRub(sellOperations: List<SellingDetails>): Map<Int, Float> {
-        val result = mutableMapOf(2020 to 0f, 2021 to 0f, 2022 to 0f)
+        val result = mutableMapOf(2020 to 0f, 2021 to 0f, 2022 to 0f, 2023 to 0f)
         result.forEach { (year, _) ->
             result[year] =
                 sellOperations.filter { it.sellOrder.date.toLocalDate().year == year }.fold(0f) { acc1, sellOp ->
@@ -41,11 +42,15 @@ class PnlCalculator(private val currencyRatesProvider: CurrencyRatesProvider) {
         return result
     }
 
-    fun getSellingDetails(trades: List<TradeOrder>, actions: List<CorporateAction>): List<SellingDetails> {
+    fun getSellingDetails(
+        trades: List<TradeOrder>,
+        actions: List<CorporateAction>,
+        instrumentInformation: Map<String, InstrumentInformation>
+    ): List<SellingDetails> {
         val tradesIterator = trades.sortedBy { it.date }.iterator()
         val actionsIterator = actions.sortedBy { it.date }.iterator()
         val sellingDetailsList = mutableListOf<SellingDetails>()
-        val openPositions = OpenPositions()
+        val openPositions = OpenPositions(instrumentInformation)
 
         var nextAction = if (actionsIterator.hasNext()) actionsIterator.next() else null
 

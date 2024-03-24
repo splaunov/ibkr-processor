@@ -33,11 +33,13 @@ class Application : Runnable {
             println("First parameter should be a directory")
             exitProcess(1)
         }
+        val instrumentInformation = reader.readInstrumentInformation(inCsvDir)
         val sellDetails = pnlCalculator.getSellingDetails(
             reader.readTrades(inCsvDir),
-            reader.readCorporateActions(inCsvDir)
+            reader.readCorporateActions(inCsvDir),
+            instrumentInformation,
         )
-        exporter.export(sellDetails, outXlsxFile)
+        exporter.export(sellDetails, outXlsxFile, instrumentInformation)
         val pnl = pnlCalculator.calculateRealizedPnlRub(sellDetails)
         println("PnL: $pnl")
     }

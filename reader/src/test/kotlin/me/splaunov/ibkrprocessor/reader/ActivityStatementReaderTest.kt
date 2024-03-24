@@ -1,31 +1,29 @@
 package me.splaunov.ibkrprocessor.reader
 
+import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest
-import jakarta.inject.Inject
+import io.kotest.matchers.shouldBe
+import io.micronaut.test.extensions.kotest5.annotation.MicronautTest
 import me.splaunov.ibkrprocessor.data.TradeOrder
-import org.junit.jupiter.api.Test
 import java.io.File
 import java.time.Instant
 
 @MicronautTest
-class ActivityStatementReaderTest {
+class ActivityStatementReaderTest(
+    private val reader: ActivityStatementReader,
+) : StringSpec({
 
-    @Inject
-    lateinit var reader: ActivityStatementReader
+    val statementsDir = File(
+        ActivityStatementReader::class.java.classLoader.getResource(
+            "statements"
+        )!!.file
+    )
 
-    @Test
-    fun readTrades() {
+    "read trades" {
 
-        val actual = reader.readTrades(
-            File(
-                ActivityStatementReader::class.java.classLoader.getResource(
-                    "statements"
-                )!!.file
-            )
-        )
+        val actual = reader.readTrades(statementsDir)
 
         actual shouldHaveSize 77
         actual shouldContain TradeOrder(
@@ -34,15 +32,9 @@ class ActivityStatementReaderTest {
         )
     }
 
-    @Test
-    fun readCorporateActions() {
-        val actual = reader.readCorporateActions(
-            File(
-                ActivityStatementReader::class.java.classLoader.getResource(
-                    "statements"
-                )!!.file
-            )
-        )
+    "read corporate actions" {
+
+        val actual = reader.readCorporateActions(statementsDir)
 
         actual shouldContainExactlyInAnyOrder listOf(
             CorporateAction(
@@ -85,4 +77,11 @@ class ActivityStatementReaderTest {
             ),
         )
     }
-}
+
+    "read instrument information" {
+
+        val actual = reader.readInstrumentInformation(statementsDir)
+
+        actual.size shouldBe 13
+    }
+})
